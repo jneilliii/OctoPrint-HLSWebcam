@@ -1,0 +1,105 @@
+/*
+ * View model for OctoPrint-HLSWebcam
+ *
+ * Author: chudsaviet, jneilliii
+ * License: AGPLv3
+ */
+$(function() {
+    function HlswebcamViewModel(parameters) {
+        var self = this;
+
+        self.controlViewModel = parameters[0];
+        self.settings = parameters[1];
+        self.webcamMjpgEnabled = ko.observable(false);
+        self.webcamHlsEnabled = ko.observable(false);
+
+        self.onBeforeBinding = function(){
+            $('#webcam_hls_container').insertBefore('#webcam_container');
+            
+        }
+        
+        var streamType = self._determine_stream_type(self.settings.webcam_streamUrl());
+            if (currentSrc != newSrc) {	            if (streamType == "mjpg") {
+                if (newSrc.lastIndexOf("?") > -1) {	                self._enableMjpgWebcam();
+                    newSrc += "&";	            } else if (streamType == "hls") {
+                } else {	                self._enableHlsWebcam();
+                    newSrc += "?";	            } else {
+                }	                throw "Unknown stream type " + streamType;
+        
+        
+        
+        
+        
+        
+        
+        self.controlViewModel._determine_stream_type = function(streamUrl) {
+            // TODO: Determine stream type by resource contents, not by extension.
+            if (streamUrl) {
+                var lastDotPosition = streamUrl.lastIndexOf(".");
+                var firstQuotationSignPosition = streamUrl.indexOf("?");
+                if (lastDotPosition > -1) {
+                    if (firstQuotationSignPosition > -1) {
+                        var extension = streamUrl.slice(lastDotPosition+1, firstQuotationSignPosition-1);
+                    } else {
+                        var extension = streamUrl.slice(lastDotPosition+1);
+                    }
+                    if (extension == "m3u8") {
+                        return "hls";
+                    };
+                };
+                return "mjpg";
+            } else {
+                throw "Empty streamUrl!";
+            };
+        };
+
+        self.controlViewModel._enableMjpgWebcam = function() {
+            var webcamImage = $("#webcam_image");
+            var currentSrc = webcamImage.attr("src");
+
+            // safari bug doesn't release the mjpeg stream, so we just set it up the once
+            if (OctoPrint.coreui.browser.safari && currentSrc != undefined) {
+                return;
+            }
+
+            var newSrc = self.settings.webcam_streamUrl();
+            if (currentSrc != newSrc) {
+                if (newSrc.lastIndexOf("?") > -1) {
+                    newSrc += "&";
+                } else {
+                    newSrc += "?";
+                }
+                newSrc += new Date().getTime();
+
+                self.webcamLoaded(false);
+                self.webcamError(false);
+                webcamImage.attr("src", newSrc);
+
+                self.webcamHlsEnabled(false);
+                self.webcamMjpgEnabled(true);
+            }
+        }
+
+        self.controlViewModel._enableHlsWebcam = function() {
+            var video = document.getElementById('webcam_hls');
+
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = self.settings.webcam_streamUrl();
+            }
+            else if (Hls.isSupported()) {
+                var hls = new Hls();
+                hls.loadSource(self.settings.webcam_streamUrl());
+                hls.attachMedia(video);
+            }
+
+            self.webcamMjpgEnabled(false);
+            self.webcamHlsEnabled(true);
+        }
+    }
+
+    OCTOPRINT_VIEWMODELS.push({
+        construct: HlswebcamViewModel,
+        dependencies: [ "controlViewModel", "settingsViewModel" ],
+        elements: []
+    });
+});
